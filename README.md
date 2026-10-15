@@ -77,7 +77,7 @@ clasp を使わない場合は、[script.google.com](https://script.google.com/)
 ### 3. Gmail にインストール
 
 - **自分だけで試す**：Apps Script エディタ →「デプロイ」→「デプロイをテスト」→「Google Workspace アドオン」→「インストール」
-- **組織全体に配布**：Google Workspace Marketplace SDK で「非公開（社内限定）」として公開し、管理コンソールから対象ユーザーにインストール
+- **組織全体に配布**：Google Workspace Marketplace SDK で「非公開（社内限定）」として公開し、管理コンソールから対象ユーザーにインストール（手順は [docs/DEPLOY.md](docs/DEPLOY.md)）
 
 ### 4. 初期設定
 
