@@ -1,0 +1,46 @@
+{
+  "timeZone": "Asia/Tokyo",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "dependencies": {
+    "enabledAdvancedServices": [
+      { "userSymbol": "Calendar", "serviceId": "calendar", "version": "v3" },
+      { "userSymbol": "Gmail", "serviceId": "gmail", "version": "v1" },
+      { "userSymbol": "People", "serviceId": "peopleapi", "version": "v1" }
+    ]
+  },
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
+    "https://www.googleapis.com/auth/gmail.addons.current.action.compose",
+    "https://mail.google.com/",
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/directory.readonly",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/script.locale",
+    "https://www.googleapis.com/auth/userinfo.email"
+  ],
+  "urlFetchWhitelist": [
+    "https://zoom.us/",
+    "https://api.zoom.us/",
+    "https://login.microsoftonline.com/",
+    "https://graph.microsoft.com/"
+  ],
+  "addOns": {
+    "common": {
+      "name": "日程調整アシスタント",
+      "logoUrl": "https://www.gstatic.com/images/branding/product/2x/calendar_2020q4_48dp.png",
+      "layoutProperties": { "primaryColor": "#1a73e8", "secondaryColor": "#188038" },
+      "homepageTrigger": { "runFunction": "onHomepage", "enabled": true },
+      "universalActions": [
+        { "label": "進行中の日程調整", "runFunction": "onShowSessions" },
+        { "label": "設定", "runFunction": "onShowSettings" }
+      ]
+    },
+    "gmail": {
+      "contextualTriggers": [
+        { "unconditional": {}, "onTriggerFunction": "onGmailMessageOpen" }
+      ]
+    }
+  }
+}

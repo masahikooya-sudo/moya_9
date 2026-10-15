@@ -1,0 +1,12 @@
+{
+  "name": "scheduling-assistant-gmail-addon",
+  "version": "1.0.0",
+  "private": true,
+  "description": "社内外の日程調整を支援する Gmail アドオン（Google Apps Script）",
+  "scripts": {
+    "test": "TZ=Asia/Tokyo node --test tests/*.test.js",
+    "check": "for f in src/*.js; do node --check \"$f\" || exit 1; done",
+    "push": "clasp push",
+    "deploy": "clasp deploy"
+  }
+}
