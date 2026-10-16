@@ -38,7 +38,7 @@ const CardService = new Proxy({}, {
   },
 });
 
-function makeEnv({ me = 'me@our.co.jp', messages = {}, threads = {}, busy = {}, scriptProps = {}, fetch = null } = {}) {
+function makeEnv({ me = 'me@our.co.jp', messages = {}, threads = {}, busy = {} } = {}) {
   const props = {};
   const store = {
     getProperty: (k) => (k in props ? props[k] : null),
@@ -53,7 +53,7 @@ function makeEnv({ me = 'me@our.co.jp', messages = {}, threads = {}, busy = {}, 
   const ctx = {
     console: { log() {}, warn() {}, error: (...a) => console.error(...a) },
     CardService,
-    PropertiesService: { getUserProperties: () => store, getScriptProperties: () => ({ getProperty: (k) => (k in scriptProps ? scriptProps[k] : null) }) },
+    PropertiesService: { getUserProperties: () => store, getScriptProperties: () => ({ getProperty: () => null }) },
     Session: { getActiveUser: () => ({ getEmail: () => me }), getEffectiveUser: () => ({ getEmail: () => me }), getScriptTimeZone: () => 'Asia/Tokyo' },
     Utilities: {
       getUuid: () => `uuid-${++seq}-0000-0000-000000000000`,
@@ -96,7 +96,7 @@ function makeEnv({ me = 'me@our.co.jp', messages = {}, threads = {}, busy = {}, 
       getDraft: (id) => ({ draftId: id }),
     },
     People: { People: { searchDirectoryPeople: () => ({ people: [{ names: [{ displayName: '鈴木 一郎' }], emailAddresses: [{ value: 'suzuki@our.co.jp' }] }] }) } },
-    UrlFetchApp: { fetch: (url, params) => { if (!fetch) throw new Error('no network in tests'); const r = fetch(url, params); return { getResponseCode: () => r.code, getContentText: () => (typeof r.body === 'string' ? r.body : JSON.stringify(r.body)) }; } },
+    UrlFetchApp: { fetch() { throw new Error('no network in tests'); } },
   };
   vm.createContext(ctx);
   for (const f of fs.readdirSync(path.join(__dirname, '..', 'src')).filter((f) => f.endsWith('.js')).sort()) {

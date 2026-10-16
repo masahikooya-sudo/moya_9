@@ -57,28 +57,9 @@ function isInternalEmail_(email, settings) {
     });
 }
 
-/**
- * 画面で選べるビデオ会議の種類。
- * Zoom / Teams は現在無効（連携コードは Conference.js に残してある）。
- * 再開するときは 'zoom' / 'teams' をこの一覧に戻し、スクリプト プロパティに資格情報を設定する。
- */
-var ENABLED_CONFERENCES = ['meet', 'manual', 'none'];
-
-function isConferenceEnabled_(type) {
-  return ENABLED_CONFERENCES.indexOf(type) >= 0;
-}
-
-/** 設定の既定ビデオ会議。無効化されたもの（以前 Teams を選んでいた等）は Meet に戻す。 */
-function defaultConference_(settings) {
-  return isConferenceEnabled_(settings.defaultConference) && settings.defaultConference !== 'manual'
-    ? settings.defaultConference
-    : 'meet';
-}
-
 /** Zoom / Teams の資格情報（スクリプト プロパティ）。README の「ビデオ会議の設定」を参照。 */
 function scriptConfig_(key) {
-  // 貼り付け時に紛れ込みやすい前後の空白・改行・全角スペースを除去する
-  return String(PropertiesService.getScriptProperties().getProperty(key) || '').replace(/^[\s\u3000]+|[\s\u3000]+$/g, '');
+  return PropertiesService.getScriptProperties().getProperty(key) || '';
 }
 
 function isZoomConfigured_() {
