@@ -82,7 +82,7 @@ function explainTeamsError_(stage, err) {
     if (/AADSTS7000215/.test(detail)) hint = 'クライアント シークレットが正しくありません。「シークレット ID」ではなく「値」を TEAMS_CLIENT_SECRET に設定してください。';
     else if (/AADSTS7000222/.test(detail)) hint = 'クライアント シークレットの有効期限が切れています。新しいシークレットを発行してください。';
     else if (/AADSTS700016/.test(detail)) hint = 'TEAMS_CLIENT_ID のアプリがテナントに見つかりません。クライアント ID とテナント ID を確認してください。';
-    else if (/AADSTS90002|AADSTS900023/.test(detail)) hint = 'TEAMS_TENANT_ID が正しくありません。';
+    else if (/AADSTS90002|AADSTS900023/.test(detail) || code === 404) hint = 'TEAMS_TENANT_ID が正しくありません。Entra 管理センターの「概要」にある「ディレクトリ (テナント) ID」を設定してください（「アプリケーション (クライアント) ID」やオブジェクト ID と取り違えやすいので注意）。';
     else hint = 'Microsoft へのサインイン（トークン取得）に失敗しました。テナント ID・クライアント ID・シークレットを確認してください。';
   } else if (stage === 'user') {
     if (code === 404) hint = '主催者のユーザーが Microsoft 365 に見つかりません。TEAMS_ORGANIZER_ID に、Microsoft 365 に存在するユーザーのオブジェクト ID を設定してください。';
@@ -97,14 +97,29 @@ function explainTeamsError_(stage, err) {
   return new Error('Teams 連携エラー：' + hint + '（HTTP ' + (code || '-') + ' ' + String(detail).slice(0, 120).trim() + '）');
 }
 
+/**
+ * TEAMS_TENANT_ID を検証して、サインイン URL に使えるテナント ID を返す。
+ * 管理画面の URL（エンドポイント）をそのまま貼った場合も、中の ID を取り出して使う。
+ */
+function teamsTenantId_() {
+  var raw = scriptConfig_('TEAMS_TENANT_ID');
+  var guid = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if (guid) return guid[0];
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(raw)) return raw; // contoso.onmicrosoft.com 形式
+  throw new Error('Teams 連携エラー：TEAMS_TENANT_ID の形式が正しくありません。Entra 管理センターの「概要」にある' +
+    '「ディレクトリ (テナント) ID」（xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx の形式）を設定してください。（現在の値：' +
+    (raw.length > 40 ? raw.slice(0, 40) + '…' : raw || '空') + '）');
+}
+
 function teamsAccessToken_() {
   var cache = CacheService.getScriptCache();
   var cached = cache.get('teams_token');
   if (cached) return cached;
+  var tenantId = teamsTenantId_();
   var json;
   try {
     json = fetchJson_(
-      'https://login.microsoftonline.com/' + encodeURIComponent(scriptConfig_('TEAMS_TENANT_ID')) + '/oauth2/v2.0/token',
+      'https://login.microsoftonline.com/' + encodeURIComponent(tenantId) + '/oauth2/v2.0/token',
       {
         method: 'post',
         payload: {

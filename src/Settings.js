@@ -59,7 +59,8 @@ function isInternalEmail_(email, settings) {
 
 /** Zoom / Teams の資格情報（スクリプト プロパティ）。README の「ビデオ会議の設定」を参照。 */
 function scriptConfig_(key) {
-  return PropertiesService.getScriptProperties().getProperty(key) || '';
+  // 貼り付け時に紛れ込みやすい前後の空白・改行・全角スペースを除去する
+  return String(PropertiesService.getScriptProperties().getProperty(key) || '').replace(/^[\s\u3000]+|[\s\u3000]+$/g, '');
 }
 
 function isZoomConfigured_() {
