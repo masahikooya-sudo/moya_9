@@ -123,3 +123,13 @@ function createConference_(type, session, slot, manualUrl) {
       return null;
   }
 }
+
+/**
+ * 【設定確認用】Apps Script エディタでこの関数を選んで「実行」すると、
+ * 1 時間後に 30 分のテスト会議を Teams に作成し、結果をログに出す。
+ */
+function testTeamsConnection() {
+  var start = Date.now() + 60 * 60 * 1000;
+  var res = createTeamsMeeting_('【接続テスト】日程調整アシスタント', start, start + 30 * 60 * 1000);
+  console.log('Teams の会議を作成できました: ' + JSON.stringify(res));
+}
