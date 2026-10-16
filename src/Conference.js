@@ -12,7 +12,11 @@ function fetchJson_(url, params) {
   var code = res.getResponseCode();
   var text = res.getContentText();
   if (code < 200 || code >= 300) {
-    throw new Error('API エラー (' + code + '): ' + text.slice(0, 300));
+    console.error('API エラー ' + url.split('?')[0] + ' (' + code + '): ' + text);
+    var err = new Error('API エラー (' + code + '): ' + text.slice(0, 300));
+    err.httpCode = code;
+    err.body = text;
+    throw err;
   }
   return text ? JSON.parse(text) : {};
 }
@@ -60,40 +64,108 @@ function createZoomMeeting_(topic, start, end) {
 
 /* ---------------- Microsoft Teams（Microsoft Graph / アプリケーション権限） ---------------- */
 
+var GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Microsoft のエラー応答から、原因と対処を日本語で説明する。 */
+function explainTeamsError_(stage, err) {
+  var body = err && err.body ? err.body : '';
+  var code = err && err.httpCode;
+  var detail = '';
+  try {
+    var json = JSON.parse(body);
+    detail = (json.error && (json.error.code || json.error)) + ' ' + ((json.error && json.error.message) || json.error_description || '');
+  } catch (e) {
+    detail = body;
+  }
+  var hint;
+  if (stage === 'token') {
+    if (/AADSTS7000215/.test(detail)) hint = 'クライアント シークレットが正しくありません。「シークレット ID」ではなく「値」を TEAMS_CLIENT_SECRET に設定してください。';
+    else if (/AADSTS7000222/.test(detail)) hint = 'クライアント シークレットの有効期限が切れています。新しいシークレットを発行してください。';
+    else if (/AADSTS700016/.test(detail)) hint = 'TEAMS_CLIENT_ID のアプリがテナントに見つかりません。クライアント ID とテナント ID を確認してください。';
+    else if (/AADSTS90002|AADSTS900023/.test(detail)) hint = 'TEAMS_TENANT_ID が正しくありません。';
+    else hint = 'Microsoft へのサインイン（トークン取得）に失敗しました。テナント ID・クライアント ID・シークレットを確認してください。';
+  } else if (stage === 'user') {
+    if (code === 404) hint = '主催者のユーザーが Microsoft 365 に見つかりません。TEAMS_ORGANIZER_ID に、Microsoft 365 に存在するユーザーのオブジェクト ID を設定してください。';
+    else if (code === 403 || code === 401) hint = '主催者のオブジェクト ID を調べる権限がありません。TEAMS_ORGANIZER_ID にオブジェクト ID（xxxxxxxx-xxxx-…の形式）を直接設定するか、アプリに「User.Read.All（アプリケーションの許可）」を追加して管理者の同意を与えてください。';
+    else hint = '主催者のユーザー情報を取得できませんでした。';
+  } else {
+    if (/application access policy/i.test(detail)) hint = 'アプリケーション アクセス ポリシーが主催者に付与されていません（Grant-CsApplicationAccessPolicy）。付与後、反映まで最大30分ほどかかります。';
+    else if (code === 403) hint = 'Teams 会議を作成する権限がありません。OnlineMeetings.ReadWrite.All（アプリケーションの許可）への管理者の同意と、アプリケーション アクセス ポリシーを確認してください。';
+    else if (code === 404) hint = '主催者が見つからないか、Teams のライセンスがありません。主催者のオブジェクト ID とライセンスを確認してください。';
+    else hint = 'Teams 会議を作成できませんでした。';
+  }
+  return new Error('Teams 連携エラー：' + hint + '（HTTP ' + (code || '-') + ' ' + String(detail).slice(0, 120).trim() + '）');
+}
+
 function teamsAccessToken_() {
   var cache = CacheService.getScriptCache();
   var cached = cache.get('teams_token');
   if (cached) return cached;
-  var json = fetchJson_(
-    'https://login.microsoftonline.com/' + encodeURIComponent(scriptConfig_('TEAMS_TENANT_ID')) + '/oauth2/v2.0/token',
-    {
-      method: 'post',
-      payload: {
-        client_id: scriptConfig_('TEAMS_CLIENT_ID'),
-        client_secret: scriptConfig_('TEAMS_CLIENT_SECRET'),
-        scope: 'https://graph.microsoft.com/.default',
-        grant_type: 'client_credentials',
-      },
-    }
-  );
+  var json;
+  try {
+    json = fetchJson_(
+      'https://login.microsoftonline.com/' + encodeURIComponent(scriptConfig_('TEAMS_TENANT_ID')) + '/oauth2/v2.0/token',
+      {
+        method: 'post',
+        payload: {
+          client_id: scriptConfig_('TEAMS_CLIENT_ID'),
+          client_secret: scriptConfig_('TEAMS_CLIENT_SECRET'),
+          scope: 'https://graph.microsoft.com/.default',
+          grant_type: 'client_credentials',
+        },
+      }
+    );
+  } catch (err) {
+    throw explainTeamsError_('token', err);
+  }
   cache.put('teams_token', json.access_token, Math.max(60, (json.expires_in || 3600) - 300));
   return json.access_token;
 }
 
+/**
+ * 会議の主催者のオブジェクト ID。
+ * onlineMeetings API はメールアドレス（UPN）を受け付けないため、オブジェクト ID に変換する。
+ * TEAMS_ORGANIZER_ID にオブジェクト ID を設定していればそれを使い、
+ * メールアドレスの場合（未設定時は利用者のアドレス）は Graph で検索する（User.Read.All が必要）。
+ */
+function teamsOrganizerObjectId_(token) {
+  var organizer = (scriptConfig_('TEAMS_ORGANIZER_ID') || myEmail_()).trim();
+  if (GUID_RE.test(organizer)) return organizer;
+  var cache = CacheService.getScriptCache();
+  var key = 'teams_oid_' + Utilities.base64EncodeWebSafe(organizer).slice(0, 200);
+  var cached = cache.get(key);
+  if (cached) return cached;
+  var json;
+  try {
+    json = fetchJson_('https://graph.microsoft.com/v1.0/users/' + encodeURIComponent(organizer) + '?$select=id', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+  } catch (err) {
+    throw explainTeamsError_('user', err);
+  }
+  cache.put(key, json.id, 6 * 60 * 60);
+  return json.id;
+}
+
 function createTeamsMeeting_(subject, start, end) {
   if (!isTeamsConfigured_()) throw new Error('Microsoft Teams の連携が設定されていません（README「ビデオ会議の設定」参照）。');
-  // 主催者: TEAMS_ORGANIZER_ID（Entra ID のユーザー ID または UPN）。未設定時は利用者のメールアドレス
-  var organizer = scriptConfig_('TEAMS_ORGANIZER_ID') || myEmail_();
-  var json = fetchJson_('https://graph.microsoft.com/v1.0/users/' + encodeURIComponent(organizer) + '/onlineMeetings', {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { Authorization: 'Bearer ' + teamsAccessToken_() },
-    payload: JSON.stringify({
-      subject: subject,
-      startDateTime: new Date(start).toISOString(),
-      endDateTime: new Date(end).toISOString(),
-    }),
-  });
+  var token = teamsAccessToken_();
+  var organizerId = teamsOrganizerObjectId_(token);
+  var json;
+  try {
+    json = fetchJson_('https://graph.microsoft.com/v1.0/users/' + organizerId + '/onlineMeetings', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + token },
+      payload: JSON.stringify({
+        subject: subject,
+        startDateTime: new Date(start).toISOString(),
+        endDateTime: new Date(end).toISOString(),
+      }),
+    });
+  } catch (err) {
+    throw explainTeamsError_('meeting', err);
+  }
   var idSettings = json.joinMeetingIdSettings || {};
   return {
     type: 'teams',
