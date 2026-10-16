@@ -90,6 +90,9 @@ Gmail のサイドバーでアドオンを開き、右上メニュー（︙）�
 
 ## ビデオ会議の設定
 
+> **現在は Google Meet と「その他（URLを手入力）」のみ有効です。** Zoom・Teams は画面に表示されません。
+> 再開するときは `src/Settings.js` の `ENABLED_CONFERENCES` に `'zoom'` / `'teams'` を戻し、下記の資格情報を設定してください。
+
 | ツール | 必要な設定 |
 |---|---|
 | Google Meet | 不要（カレンダー予定に Meet を自動追加） |

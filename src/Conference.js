@@ -195,6 +195,7 @@ function createTeamsMeeting_(subject, start, end) {
  * @param {'meet'|'zoom'|'teams'|'manual'|'none'} type
  */
 function createConference_(type, session, slot, manualUrl) {
+  if (type && !isConferenceEnabled_(type)) throw new Error(CONFERENCE_LABELS[type] + ' は現在利用できません。Google Meet または URL の手入力を選んでください。');
   var topic = buildEventTitle(session.info, 'confirmed');
   switch (type) {
     case 'zoom':

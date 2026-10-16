@@ -116,3 +116,17 @@ test('新規で作成: 全員の空きから候補を探して打診メールを
   assert.match(d.body, /場所：貴社 本社/);
   assert.strictEqual(s.threadIds.length, 1, '下書きのスレッドが紐づく');
 });
+
+test('ビデオ会議は Meet・手入力・作成しないのみ選べ、Teams・Zoom は表示も実行もされない', () => {
+  const env = makeEnv({ scriptProps: { TEAMS_TENANT_ID: 'x', TEAMS_CLIENT_ID: 'y', TEAMS_CLIENT_SECRET: 'z' } });
+  const g = env.ctx;
+  // 以前 Teams を既定にしていた利用者の設定も Meet に戻る
+  g.saveSettings_({ ...g.getSettings_(), defaultConference: 'teams' });
+  const s = { id: 's1', kind: 'reply', status: 'pending', threadIds: [], info: { company: 'A', project: 'P', mode: 'web' }, participants: [], candidates: [{ start: at(20, 10), end: at(20, 11) }] };
+  const card = JSON.stringify(g.buildConfirmCard_(s, null, null));
+  assert.doesNotMatch(card, /Teams|Zoom/);
+  assert.match(card, /\["Google Meet","meet",true\]/);
+  const settingsCard = JSON.stringify(g.buildSettingsCard_());
+  assert.doesNotMatch(settingsCard, /"teams"|"zoom"/);
+  assert.throws(() => g.createConference_('teams', s, s.candidates[0], ''), /現在利用できません/);
+});

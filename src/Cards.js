@@ -320,13 +320,8 @@ function buildConfirmCard_(session, e, detection) {
   cands.forEach(function (c, i) { pick.addItem(formatSlot(c.start, c.end), String(i), i === defIdx); });
   card.addSection(CardService.newCardSection().addWidget(pick));
 
-  var defaultConf = session.info.mode === 'visit' ? 'none' : settings.defaultConference;
-  var confItems = ['meet', 'zoom', 'teams', 'manual', 'none'].map(function (k) {
-    var label = CONFERENCE_LABELS[k];
-    if (k === 'zoom' && !isZoomConfigured_()) label += '（未設定）';
-    if (k === 'teams' && !isTeamsConfigured_()) label += '（未設定）';
-    return [label, k];
-  });
+  var defaultConf = session.info.mode === 'visit' ? 'none' : defaultConference_(settings);
+  var confItems = ENABLED_CONFERENCES.map(function (k) { return [CONFERENCE_LABELS[k], k]; });
   var act = CardService.newCardSection().setHeader('実行するアクション')
     .addWidget(checkboxes_('confirmOpts', '', [
       ['確定した日時でカレンダーを更新（他の候補は削除）', 'updateCal', true],
@@ -425,7 +420,9 @@ function buildSettingsCard_() {
     .addWidget(dropdown_('dayStartMin', '候補の時間帯（開始）', timeOptions_(), s.dayStartMin))
     .addWidget(dropdown_('dayEndMin', '候補の時間帯（終了）', timeOptions_(), s.dayEndMin))
     .addWidget(dropdown_('defaultRole', '先方の立場', ROLE_OPTIONS.map(function (r) { return [r, r]; }), s.defaultRole))
-    .addWidget(dropdown_('defaultConference', 'ビデオ会議', ['meet', 'zoom', 'teams', 'none'].map(function (k) { return [CONFERENCE_LABELS[k], k]; }), s.defaultConference))
+    .addWidget(dropdown_('defaultConference', 'ビデオ会議',
+      ENABLED_CONFERENCES.filter(function (k) { return k !== 'manual'; }).map(function (k) { return [CONFERENCE_LABELS[k], k]; }),
+      defaultConference_(s)))
     .addWidget(textInput_('subjectTemplate', '件名テンプレート', s.subjectTemplate,
       '{status} {mode} {company} {project} {contact} {role} が使えます'))
     .addWidget(checkboxes_('flags', '', [
@@ -434,10 +431,9 @@ function buildSettingsCard_() {
       ['社内参加者も仮押さえに招待する', 'inviteMembersToHolds', s.inviteMembersToHolds],
       ['社内参加者をメールのCCに入れる', 'ccMembers', s.ccMembers],
     ])));
-  card.addSection(CardService.newCardSection().setHeader('ビデオ会議の連携状況')
-    .addWidget(paragraph_('Google Meet：✅ 利用可能<br>Zoom：' + (isZoomConfigured_() ? '✅ 設定済み' : '未設定') +
-      '<br>Microsoft Teams：' + (isTeamsConfigured_() ? '✅ 設定済み' : '未設定') +
-      '<br>' + colored_('Zoom / Teams は管理者がスクリプト プロパティに資格情報を設定します（README 参照）。', '#5f6368'))));
+  card.addSection(CardService.newCardSection().setHeader('ビデオ会議')
+    .addWidget(paragraph_('Google Meet：✅ 利用可能<br>' +
+      colored_('先方指定の Zoom・Teams などの会議は、確定時に「その他（URLを手入力）」で URL を入力してください。', '#5f6368'))));
   card.setFixedFooter(CardService.newFixedFooter().setPrimaryButton(filledButton_('保存', action_('actSaveSettings', null))));
   return card.build();
 }
