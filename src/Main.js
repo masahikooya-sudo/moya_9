@@ -97,7 +97,9 @@ function initMailSession_(e, msg, id) {
 function initProposeSession_(e, id, fromMail) {
   var settings = getSettings_();
   var s = baseSession_(id, 'propose', settings);
-  if (fromMail && e && e.gmail) prefillFromMessage_(s, e, openMessage_(e), settings);
+  // Gmail はメール未選択でも e.gmail を送ってくることがあるため、実際に開いているメールの有無で判定する
+  var msg = fromMail ? openMessage_(e) : null;
+  if (msg) prefillFromMessage_(s, e, msg, settings);
   return s;
 }
 
@@ -109,8 +111,10 @@ function loadSession_(e) {
   var p = params_(e);
   var s = getSession_(p.sid);
   if (s) return s;
-  if (p.kind === 'propose') return initProposeSession_(e, p.sid, !!(e && e.gmail));
-  return initMailSession_(e, openMessage_(e), p.sid);
+  if (p.kind === 'propose') return initProposeSession_(e, p.sid, true);
+  var msg = openMessage_(e);
+  if (!msg) throw new Error('メールが開かれていません。メールを開き直してから操作してください。');
+  return initMailSession_(e, msg, p.sid);
 }
 
 /** スレッドに紐づくセッション。見つからなければ件名（会社名・案件名）で調整中のものを探す。 */
@@ -439,7 +443,7 @@ function actGoPropose(e) {
 
 function actGoMail(e) {
   return safeAction_(function () {
-    if (!e.gmail) return notify_('メールを開いた状態で使用してください');
+    if (!hasOpenMessage_(e)) return notify_('メールを開いた状態で使用してください');
     return CardService.newActionResponseBuilder().setNavigation(CardService.newNavigation().popToRoot()).build();
   });
 }

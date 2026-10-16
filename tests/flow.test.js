@@ -116,3 +116,49 @@ test('新規で作成: 全員の空きから候補を探して打診メールを
   assert.match(d.body, /場所：貴社 本社/);
   assert.strictEqual(s.threadIds.length, 1, '下書きのスレッドが紐づく');
 });
+
+test('メールを開いていないホーム画面から「候補日を探す」を押してもエラーにならない（e.gmail はあるが messageId なし）', () => {
+  const env = makeEnv();
+  const g = env.ctx;
+  const home = g.onHomepage({ commonEventObject: {} });
+  const sid = JSON.stringify(home).match(/"sid":"([^"]+)"/)[1];
+  const res = g.actFindSlots({
+    gmail: {}, // Gmail はメール未選択でも gmail オブジェクトを送ってくることがある
+    commonEventObject: {
+      parameters: { sid, kind: 'propose', form: 'info,members,search' },
+      formInputs: {
+        to: { stringInputs: { value: ['ntest@pdpro.jp'] } },
+        company: { stringInputs: { value: ['ダミー株式会社'] } },
+        contact: { stringInputs: { value: ['田中'] } },
+        project: { stringInputs: { value: ['お打ち合わせの候補日について'] } },
+        mode: { stringInputs: { value: ['web'] } },
+        rangeStart: { dateInput: { msSinceEpoch: String(Date.UTC(2026, 9, 19)) } },
+        rangeEnd: { dateInput: { msSinceEpoch: String(Date.UTC(2026, 9, 30)) } },
+        dayStart: { stringInputs: { value: ['600'] } },
+        dayEnd: { stringInputs: { value: ['1080'] } },
+        duration: { stringInputs: { value: ['60'] } },
+        count: { stringInputs: { value: ['3'] } },
+        searchOpts: { stringInputs: { value: ['skipWeekends'] } },
+      },
+    },
+  });
+  const text = JSON.stringify(res);
+  assert.doesNotMatch(text, /エラー/);
+  const s = g.getSession_(sid);
+  assert.strictEqual(s.to, 'ntest@pdpro.jp');
+  assert.strictEqual(s.info.company, 'ダミー株式会社');
+  assert.strictEqual(s.candidates.length, 3);
+
+  // 続けて「候補日を送る」も通る（宛先あての新規下書き）
+  const sent = g.actSendCandidates({
+    gmail: {},
+    commonEventObject: {
+      parameters: { sid, kind: 'propose', form: 'cands,opts' },
+      formInputs: { cand_0: { stringInputs: { value: ['0'] } }, cand_1: { stringInputs: { value: ['1'] } }, opts: { stringInputs: { value: ['hold'] } } },
+    },
+  });
+  assert.doesNotMatch(JSON.stringify(sent), /エラー/);
+  const d = env.drafts[g.getSession_(sid).draftId];
+  assert.strictEqual(d.subject, '【調整中】【Web】ダミー株式会社｜お打ち合わせの候補日について｜田中バイヤー');
+  assert.match(d.mime, /^To: ntest@pdpro.jp$/m);
+});

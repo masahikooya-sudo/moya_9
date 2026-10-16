@@ -202,7 +202,7 @@ function buildFromMailCard_(session, e) {
 
 function buildProposeCard_(session, e, sessions) {
   var card = CardService.newCardBuilder().setName('propose').setHeader(header_('新規で作成'));
-  if (e && e.gmail) card.addSection(CardService.newCardSection().addWidget(tabs_(session, 'propose')));
+  if (hasOpenMessage_(e)) card.addSection(CardService.newCardSection().addWidget(tabs_(session, 'propose')));
 
   var hasThread = (session.threadIds || []).length > 0;
   card.addSection(infoSection_(session, '① 案件情報', !hasThread));
@@ -341,7 +341,7 @@ function buildConfirmCard_(session, e, detection) {
 
   var more = CardService.newCardSection();
   var buttons = CardService.newButtonSet();
-  if (e && e.gmail) {
+  if (hasOpenMessage_(e)) {
     buttons.addButton(composeButton_('確定して下書きを開く', action_('actConfirmCompose', session, { form: 'confirm' }), true, false));
   }
   buttons.addButton(button_('候補日を出し直す', action_('actReplan', session)));
@@ -374,7 +374,7 @@ function buildConfirmedCard_(session, e) {
   }
   sec.addWidget(buttons);
   card.addSection(sec);
-  if (e && e.gmail) {
+  if (hasOpenMessage_(e)) {
     card.addSection(CardService.newCardSection().addWidget(button_('このメールで新しく日程調整を始める', action_('actStartFresh', session))));
   }
   return card.build();

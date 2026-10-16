@@ -4,6 +4,11 @@
  * 高度なサービス「Gmail API (v1)」で MIME を組み立てて作成する。
  */
 
+/** いまメールを開いている状態か（Gmail はメール未選択でも e.gmail を送ることがある）。 */
+function hasOpenMessage_(e) {
+  return !!(e && e.gmail && e.gmail.messageId);
+}
+
 function openMessage_(e) {
   if (!e || !e.gmail || !e.gmail.messageId) return null;
   if (e.gmail.accessToken) GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
